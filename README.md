@@ -31,3 +31,81 @@
 
 ## Spring MVC의 실제 흐름
 ![image](https://user-images.githubusercontent.com/66157892/147830527-efbfc842-1378-4d69-8fb9-c543f3bf6ff4.png)
+
+## HTTP 요청 - GET, POST, HTTP message body
+### GET - 쿼리 파라미터
+- 예) /url?username=hello&age=20
+- 메시지 바디 없이, URL의 쿼리 파라미터에 데이터를 포함해서 전달
+- 예) 검색, 필터, 페이징등에서 많이 사용하는 방식
+### POST - HTML Form
+- content-type: application/x-www-form-urlencoded
+- 메시지 바디에 쿼리 파리미터 형식으로 전달 username=hello&age=20
+- 예) 회원 가입, 상품 주문, HTML Form 사용
+### HTTP message body에 데이터를 직접 담아서 요청
+- HTTP API에서 주로 사용, JSON, XML, TEXT
+- 데이터 형식은 주로 JSON 사용
+- POST, PUT, PATCH
+#### 요청 파라미터 vs HTTP 메시지 바디
+- 요청 파라미터를 조회하는 기능: @RequestParam , @ModelAttribute
+- HTTP 메시지 바디를 직접 조회하는 기능: @RequestBody
+
+## HTTP 응답 - 정적 리소스, 뷰 템플릿
+### 정적 리소스
+- 예) 웹 브라우저에 정적인 HTML, css, js을 제공할 때는, 정적 리소스를 사용한다.
+### 뷰 템플릿 사용
+- 예) 웹 브라우저에 동적인 HTML을 제공할 때는 뷰 템플릿을 사용한다.
+### HTTP 메시지 사용
+- HTTP API를 제공하는 경우에는 HTML이 아니라 데이터를 전달해야 하므로, HTTP 메시지 바디에 JSON 같은 형식으로 데이터를 실어 보낸다
+
+## MessageConverter
+### 스프링 MVC는 다음의 경우에 HTTP 메시지 컨버터를 적용한다.
+1. <b>HTTP 요청: @RequestBody , HttpEntity(RequestEntity) </b>
+2. <b>HTTP 응답: @ResponseBody , HttpEntity(ResponseEntity)</b>
+<br>
+- <b>ByteArrayHttpMessageConverter</b> : byte[] 데이터를 처리한다.
+    클래스 타입: byte[] , 미디어타입: */* ,<br>
+    요청 예) @RequestBody byte[] data <br>
+    응답 예) @ResponseBody return byte[] 쓰기 미디어타입 application/octet-stream <br>
+- <b>StringHttpMessageConverter</b> : String 문자로 데이터를 처리한다.
+클래스 타입: String , 미디어타입: */* <br>
+요청 예) @RequestBody String data <br>
+응답 예) @ResponseBody return "ok" 쓰기 미디어타입 text/plain <br>
+- <b>MappingJackson2HttpMessageConverter</b> : application/json
+클래스 타입: 객체 또는 HashMap , 미디어타입 application/json 관련 <br>
+요청 예) @RequestBody HelloData data <br>
+응답 예) @ResponseBody return helloData 쓰기 미디어타입 application/json 관련 <br>
+
+### HTTP 요청 데이터 읽기
+- HTTP 요청이 오고, 컨트롤러에서 @RequestBody , HttpEntity 파라미터를 사용한다.
+- 메시지 컨버터가 메시지를 읽을 수 있는지 확인하기 위해 canRead() 를 호출한다.
+- 대상 클래스 타입을 지원하는가.예) @RequestBody 의 대상 클래스 ( byte[] , String , HelloData )
+- HTTP 요청의 Content-Type 미디어 타입을 지원하는가. 예) text/plain , application/json , */*
+- canRead() 조건을 만족하면 read() 를 호출해서 객체 생성하고, 반환한다.
+
+### HTTP 응답 데이터 생성
+- 컨트롤러에서 @ResponseBody , HttpEntity 로 값이 반환된다.
+- 메시지 컨버터가 메시지를 쓸 수 있는지 확인하기 위해 canWrite() 를 호출한다.
+- 대상 클래스 타입을 지원하는가. 예) return의 대상 클래스 ( byte[] , String , HelloData )
+- HTTP 요청의 Accept 미디어 타입을 지원하는가.(더 정확히는 @RequestMapping 의 produces ) 예) text/plain , application/json , */*
+- canWrite() 조건을 만족하면 write() 를 호출해서 HTTP 응답 메시지 바디에 데이터를 생성한다.
+
+## RequestMappingHandlerAdapter 동작 방식
+![arg](https://user-images.githubusercontent.com/66157892/147849787-f55e6dd1-e4e5-41b5-aa16-b8ef37407a0c.PNG)
+### ArgumentResolver
+-  애노테이션 기반의 컨트롤러는 매우 다양한 파라미터를 사용할 수 있었다. HttpServletRequest , Model 은 물론이고, @RequestParam , @ModelAttribute 같은 애노테이션 그리고 @RequestBody , HttpEntity 같은 HTTP 메시지를 처리하는 부분까지 매우 큰 유연함을 보여주었다. 이렇게 파라미터를 유연하게 처리할 수 있는 이유가 바로 <b>ArgumentResolver</b> 덕분이다
+- RequestMappingHandlerAdaptor 는 바로 이 <b>ArgumentResolver</b> 를 호출해서 컨트롤러(핸들러)가 필요로 하는 다양한 <b>파라미터의 값(객체)을 생성한다.</b>
+### 동작 방식
+- 동작 방식 ArgumentResolver 의 supportsParameter() 를 호출해서 해당 파라미터를 지원하는지 체크하고, 지원하면 <b>resolveArgument() 를 호출해서 실제 객체를 생성한다.</b> 그리고 이렇게 생성된 객체가 컨트롤러 호출시 넘어가는 것이다
+### ReturnValueHandler
+HandlerMethodReturnValueHandler 를 줄여서 ReturnValueHandle 라 부른다.
+ArgumentResolver 와 비슷한데, 이것은 응답 값을 변환하고 처리한다.
+컨트롤러에서 String으로 뷰 이름을 반환해도, 동작하는 이유가 바로 ReturnValueHandler 덕분이다.
+어떤 종류들이 있는지 살짝 코드로 확인만 해보자
+
+## HTTP 메시지 컨버터
+![cnc](https://user-images.githubusercontent.com/66157892/147850005-e32c1d63-94c2-4510-bf7b-ba3a893261c5.PNG)<br>
+### 요청의 경우
+- @RequestBody 를 처리하는 ArgumentResolver 가 있고, HttpEntity 를 처리하는 ArgumentResolver 가 있다. 이 <b>ArgumentResolver 들이 HTTP 메시지 컨버터를 사용해서 필요한 객체를 생성하는 것이다.</b>
+### 응답의 경우
+- @ResponseBody 와 HttpEntity 를 처리하는 ReturnValueHandler 가 있다. 그리고 여기에서 HTTP 메시지 컨버터를 호출해서 응답 결과를 만든다.
+
